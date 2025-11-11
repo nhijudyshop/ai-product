@@ -12,7 +12,7 @@
     <!-- Firebase v9+ modular SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, query, orderBy, onSnapshot, setDoc, getDoc, getDocs, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         import { getStorage, ref, uploadString, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
         window.firebaseModules = {
@@ -26,6 +26,10 @@
             query,
             orderBy,
             onSnapshot,
+            setDoc,
+            getDoc,
+            getDocs,
+            limit,
             getStorage,
             ref,
             uploadString,
@@ -63,7 +67,7 @@
                 icon: '🧠',
                 color: 'orange',
                 needsApiKey: false,
-                description: 'Phân tích màu sắc cơ bản, học từ sản phẩm cũ',
+                description: 'Phân tích màu sắc, học từ Gemini/DeepSeek',
                 pricing: 'MIỄN PHÍ 100%'
             },
             GEMINI: {
@@ -193,8 +197,38 @@
             return patterns;
         };
 
-        const generateProductName = (colorName, products) => {
+        const generateProductName = (colorName, products, trainingData = []) => {
             const patterns = learnFromPastProducts(products);
+
+            // Learn from AI training data (Gemini/DeepSeek results)
+            const aiPatterns = {
+                keywords: {},
+                structures: [],
+                brands: new Set()
+            };
+
+            trainingData.forEach(training => {
+                const name = training.productName.toUpperCase();
+                const words = name.split(/[\s+\-,]/);
+
+                words.forEach(word => {
+                    if (word.length > 1) {
+                        aiPatterns.keywords[word] = (aiPatterns.keywords[word] || 0) + 1;
+                    }
+                });
+
+                if (name.includes('SET')) aiPatterns.structures.push('SET');
+                if (name.includes('ĐẦM')) aiPatterns.structures.push('ĐẦM');
+                if (name.includes('ÁO')) aiPatterns.structures.push('ÁO');
+                if (name.includes('Q.') || name.includes('QUẦN')) aiPatterns.structures.push('QUẦN');
+
+                const brandPatterns = ['ALO', 'BBR', 'MM', 'ZARA', 'H&M', 'UNIQLO'];
+                brandPatterns.forEach(brand => {
+                    if (name.includes(brand)) {
+                        aiPatterns.brands.add(brand);
+                    }
+                });
+            });
 
             const templates = [
                 `SET ÁO + Q. ${colorName}`,
@@ -204,12 +238,24 @@
                 `SET ÁO TD + Q. ${colorName}`,
             ];
 
-            if (patterns.structures.length > 0) {
+            // Prioritize AI-learned patterns
+            if (aiPatterns.structures.length > 0) {
+                const mostCommon = aiPatterns.structures[0];
+                templates.unshift(`${mostCommon} ${colorName}`);
+            }
+
+            if (aiPatterns.brands.size > 0) {
+                const brand = Array.from(aiPatterns.brands)[0];
+                templates.unshift(`SET ${colorName} ${brand}`);
+            }
+
+            // Fallback to user patterns
+            if (templates.length === 5 && patterns.structures.length > 0) {
                 const mostCommon = patterns.structures[0];
                 templates.unshift(`${mostCommon} ${colorName}`);
             }
 
-            if (patterns.brands.size > 0) {
+            if (templates.length === 5 && patterns.brands.size > 0) {
                 const brand = Array.from(patterns.brands)[0];
                 templates.unshift(`SET ${colorName} ${brand}`);
             }
@@ -240,6 +286,8 @@
                 gemini: '',
                 deepseek: ''
             });
+            const [trainingData, setTrainingData] = useState([]);
+            const [trainingDataCount, setTrainingDataCount] = useState(0);
 
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
@@ -281,7 +329,7 @@
 
             const initFirebase = async (config) => {
                 try {
-                    const { initializeApp, getFirestore, getStorage, collection, query, orderBy, onSnapshot } = window.firebaseModules;
+                    const { initializeApp, getFirestore, getStorage, collection, query, orderBy, onSnapshot, doc, getDoc, getDocs, limit } = window.firebaseModules;
 
                     const app = initializeApp(config);
                     const firestoreDb = getFirestore(app);
@@ -291,6 +339,7 @@
                     setDb(firestoreDb);
                     setStorage(firebaseStorage);
 
+                    // Load products
                     const productsRef = collection(firestoreDb, 'clothing_products');
                     const q = query(productsRef, orderBy('createdAt', 'desc'));
 
@@ -311,9 +360,73 @@
                     });
 
                     setUnsubscribe(() => unsub);
+
+                    // Load API keys from Firebase
+                    await loadApiKeysFromFirebase(firestoreDb);
+
+                    // Load AI training data
+                    await loadTrainingDataFromFirebase(firestoreDb);
                 } catch (error) {
                     console.error('Error initializing Firebase:', error);
                     loadLocalProducts();
+                }
+            };
+
+            const loadApiKeysFromFirebase = async (firestoreDb) => {
+                try {
+                    const { doc, getDoc } = window.firebaseModules;
+                    const keysDoc = await getDoc(doc(firestoreDb, 'settings', 'api_keys'));
+
+                    if (keysDoc.exists()) {
+                        const keys = keysDoc.data();
+                        setApiKeys({
+                            gemini: keys.gemini || '',
+                            deepseek: keys.deepseek || ''
+                        });
+
+                        // Also save to localStorage as backup
+                        if (keys.gemini) localStorage.setItem('gemini_api_key', keys.gemini);
+                        if (keys.deepseek) localStorage.setItem('deepseek_api_key', keys.deepseek);
+                    }
+                } catch (error) {
+                    console.error('Error loading API keys from Firebase:', error);
+                    // Fallback to localStorage
+                    const savedGeminiKey = localStorage.getItem('gemini_api_key');
+                    const savedDeepseekKey = localStorage.getItem('deepseek_api_key');
+                    setApiKeys({
+                        gemini: savedGeminiKey || '',
+                        deepseek: savedDeepseekKey || ''
+                    });
+                }
+            };
+
+            const loadTrainingDataFromFirebase = async (firestoreDb) => {
+                try {
+                    const { collection, query, orderBy, getDocs, limit } = window.firebaseModules;
+                    const trainingRef = collection(firestoreDb, 'ai_training_data');
+                    const q = query(trainingRef, orderBy('createdAt', 'desc'), limit(100));
+
+                    const snapshot = await getDocs(q);
+                    const data = [];
+                    snapshot.forEach((doc) => {
+                        data.push({
+                            id: doc.id,
+                            ...doc.data()
+                        });
+                    });
+
+                    setTrainingData(data);
+                    setTrainingDataCount(data.length);
+                    localStorage.setItem('ai_training_data', JSON.stringify(data));
+                } catch (error) {
+                    console.error('Error loading training data:', error);
+                    // Fallback to localStorage
+                    const saved = localStorage.getItem('ai_training_data');
+                    if (saved) {
+                        const data = JSON.parse(saved);
+                        setTrainingData(data);
+                        setTrainingDataCount(data.length);
+                    }
                 }
             };
 
@@ -335,15 +448,56 @@
                 }
             };
 
-            const saveApiKey = (provider) => {
+            const saveApiKey = async (provider) => {
                 const key = apiKeys[provider];
                 if (!key || !key.trim()) {
                     alert('Vui lòng nhập API Key');
                     return;
                 }
+
+                // Save to localStorage as backup
                 localStorage.setItem(`${provider}_api_key`, key.trim());
-                setShowApiSetup(false);
-                alert('✅ Đã lưu API Key!');
+
+                // Save to Firebase
+                if (db) {
+                    try {
+                        const { doc, setDoc } = window.firebaseModules;
+                        await setDoc(doc(db, 'settings', 'api_keys'), {
+                            [provider]: key.trim()
+                        }, { merge: true });
+
+                        setShowApiSetup(false);
+                        alert('✅ Đã lưu API Key vào Firebase!\n\n⚠️ Lưu ý: API key sẽ sync across devices. Chỉ dùng cho mục đích cá nhân.');
+                    } catch (error) {
+                        console.error('Error saving API key to Firebase:', error);
+                        setShowApiSetup(false);
+                        alert('⚠️ Đã lưu API Key local.\nKhông thể lưu vào Firebase.');
+                    }
+                } else {
+                    setShowApiSetup(false);
+                    alert('✅ Đã lưu API Key local!');
+                }
+            };
+
+            const saveTrainingDataToFirebase = async (imageUrl, productName, aiProvider) => {
+                if (!db) return;
+
+                try {
+                    const { collection, addDoc } = window.firebaseModules;
+                    await addDoc(collection(db, 'ai_training_data'), {
+                        imageUrl: imageUrl,
+                        productName: productName,
+                        aiProvider: aiProvider,
+                        createdAt: new Date()
+                    });
+
+                    console.log(`✅ Saved training data from ${aiProvider}: ${productName}`);
+
+                    // Reload training data
+                    await loadTrainingDataFromFirebase(db);
+                } catch (error) {
+                    console.error('Error saving training data:', error);
+                }
             };
 
             const updateApiKey = (provider, value) => {
@@ -482,17 +636,44 @@
 
                 try {
                     let name = '';
+                    let imageUrl = null;
 
                     if (selectedProvider === 'local') {
-                        // Local AI - Color analysis
+                        // Local AI - Color analysis + Learn from training data
                         const colorName = await analyzeImageColors(imageData);
-                        name = generateProductName(colorName, products);
+                        name = generateProductName(colorName, products, trainingData);
                     } else if (selectedProvider === 'gemini') {
                         // Google Gemini
                         name = await analyzeWithGemini(imageData);
+
+                        // Save training data for Local AI to learn
+                        if (storage) {
+                            try {
+                                const { ref, uploadString, getDownloadURL } = window.firebaseModules;
+                                const imageRef = ref(storage, `training/${Date.now()}.jpg`);
+                                await uploadString(imageRef, imageData, 'data_url');
+                                imageUrl = await getDownloadURL(imageRef);
+                                await saveTrainingDataToFirebase(imageUrl, name, 'gemini');
+                            } catch (error) {
+                                console.error('Error saving training data:', error);
+                            }
+                        }
                     } else if (selectedProvider === 'deepseek') {
                         // DeepSeek
                         name = await analyzeWithDeepSeek(imageData);
+
+                        // Save training data for Local AI to learn
+                        if (storage) {
+                            try {
+                                const { ref, uploadString, getDownloadURL } = window.firebaseModules;
+                                const imageRef = ref(storage, `training/${Date.now()}.jpg`);
+                                await uploadString(imageRef, imageData, 'data_url');
+                                imageUrl = await getDownloadURL(imageRef);
+                                await saveTrainingDataToFirebase(imageUrl, name, 'deepseek');
+                            } catch (error) {
+                                console.error('Error saving training data:', error);
+                            }
+                        }
                     }
 
                     setSuggestedName(name);
@@ -782,7 +963,7 @@ Hãy phân tích hình ảnh và đề xuất TÊN DUY NHẤT theo format trên.
                             </div>
 
                             {/* Status indicators */}
-                            <div className="flex items-center gap-3 mt-4">
+                            <div className="flex flex-wrap items-center gap-3 mt-4">
                                 <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
                                     isOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                 }`}>
@@ -793,6 +974,12 @@ Hãy phân tích hình ảnh và đề xuất TÊN DUY NHẤT theo format trên.
                                 <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-${currentProvider.color}-100 text-${currentProvider.color}-700 text-xs font-semibold`}>
                                     <span>{currentProvider.icon} {currentProvider.name}</span>
                                 </div>
+
+                                {trainingDataCount > 0 && (
+                                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                                        <span>🎓 AI đã học: {trainingDataCount} mẫu</span>
+                                    </div>
+                                )}
 
                                 {isSyncing && (
                                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold">
@@ -981,14 +1168,16 @@ Hãy phân tích hình ảnh và đề xuất TÊN DUY NHẤT theo format trên.
                         {/* Footer info */}
                         <div className="mt-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 text-sm text-gray-700 border border-indigo-200">
                             <p className="font-semibold mb-2">
-                                🎯 Multi-AI Platform - So sánh & chọn AI tốt nhất
+                                🎯 Multi-AI Platform với AI Self-Learning
                             </p>
                             <ul className="list-disc list-inside space-y-1 text-xs">
-                                <li><strong>Local AI:</strong> MIỄN PHÍ 100%, offline, phân tích màu sắc cơ bản</li>
-                                <li><strong>Google Gemini:</strong> FREE 60 req/phút, chính xác cao</li>
-                                <li><strong>DeepSeek:</strong> RẺ NHẤT ($0.14/1M), FREE 5M tokens, OpenAI-compatible</li>
-                                <li>✅ Switch AI providers real-time</li>
-                                <li>✅ Firebase cloud storage + offline support</li>
+                                <li><strong>Local AI:</strong> MIỄN PHÍ 100%, offline, <span className="font-semibold text-indigo-600">tự học từ Gemini/DeepSeek</span></li>
+                                <li><strong>Google Gemini:</strong> FREE 60 req/phút, chính xác cao, dạy Local AI</li>
+                                <li><strong>DeepSeek:</strong> RẺ NHẤT ($0.14/1M), FREE 5M tokens, dạy Local AI</li>
+                                <li>✅ API keys sync qua Firebase (across devices)</li>
+                                <li>✅ Khi dùng Gemini/DeepSeek → Lưu kết quả → Local AI học</li>
+                                <li>✅ Local AI càng dùng càng thông minh 🧠</li>
+                                <li>⚠️ <span className="text-amber-700">Lưu ý: API keys lưu Firebase, chỉ dùng cá nhân</span></li>
                             </ul>
                         </div>
                     </div>
