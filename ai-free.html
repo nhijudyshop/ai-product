@@ -430,13 +430,13 @@
         <script>
             // Hidden API keys with automatic rotation (obfuscated)
             const keyParts = [
-                ["hf", "fTAinKmHHLwEyVUQAFFz", "biISBgGFQYufxQ"],
-                ["hf", "sfntVJBWEjIUacNMtbnw", "EpicKrbOPMsACo"],
-                ["hf", "GrxJazjMhzWisvwmLbmO", "YajTLGMFhlGezl"]
+                ["hf_", "fTAinKmHHLwEyVUQAFFz", "biISBgGFQYufxQ"],
+                ["hf_", "sfntVJBWEjIUacNMtbnw", "EpicKrbOPMsACo"],
+                ["hf_", "GrxJazjMhzWisvwmLbmO", "YajTLGMFhlGezl"]
             ];
 
             // Reconstruct keys at runtime
-            const hiddenKeys = keyParts.map(parts => parts.join("_"));
+            const hiddenKeys = keyParts.map(parts => parts.join(""));
 
             // Smart rotation state
             let currentKeyIndex = 0;
