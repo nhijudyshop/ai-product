@@ -130,6 +130,11 @@
                 color: white;
             }
 
+            .badge-pro {
+                background: #ff9800;
+                color: white;
+            }
+
             .token-input {
                 margin-bottom: 20px;
             }
@@ -275,13 +280,13 @@
         <div class="container">
             <div class="header">
                 <h1>🖼️ Free Vision AI</h1>
-                <p>Phân tích hình ảnh với Florence-2 & Gemini Vision - 100% FREE</p>
+                <p>Phân tích hình ảnh với Florence-2 & Gemini 2.5 Pro - 100% FREE</p>
             </div>
 
             <div class="info-banner">
-                <strong>🎉 Hoàn toàn miễn phí!</strong> Sử dụng Hugging Face Florence-2 hoặc Google Gemini Vision để phân tích hình ảnh.<br>
+                <strong>🎉 Hoàn toàn miễn phí!</strong> Sử dụng Hugging Face Florence-2 hoặc Google Gemini 2.5 Pro để phân tích hình ảnh.<br>
                 <strong>🛡️ Auto-Fallback:</strong> Nếu Gemini không khả dụng (503/429), hệ thống tự động chuyển sang Florence-2.<br>
-                <strong>🔑 Smart Rotation:</strong> 5 Gemini keys + 3 HF keys tự động xoay vòng.
+                <strong>🔑 Smart Rotation:</strong> 9 Gemini keys + 3 HF keys tự động xoay vòng.
             </div>
 
             <div class="content">
@@ -297,10 +302,11 @@
                     </div>
 
                     <div class="provider-item" onclick="selectProvider('gemini')">
-                        <h4>🌟 Google Gemini</h4>
-                        <small>Gemini 2.5 Flash</small>
+                        <h4>💎 Google Gemini Pro</h4>
+                        <small>Gemini 2.5 Pro (Most Advanced)</small>
                         <br />
-                        <span class="badge badge-free">250/day FREE</span>
+                        <span class="badge badge-free">50/day FREE</span>
+                        <span class="badge badge-pro">PRO</span>
                     </div>
 
                     <div class="token-input" id="hfTokenInput">
@@ -327,7 +333,7 @@
                             placeholder="AIza... (Optional)"
                         />
                         <div style="font-size: 10px; color: #999; margin-top: 5px;">
-                            Để trống = dùng auto-rotate keys (5 keys)
+                            Để trống = dùng auto-rotate keys (9 keys)
                         </div>
                     </div>
                 </div>
@@ -408,7 +414,11 @@
                 ["AIzaSyB", "l2AO6Wmo", "JHwIlnFg6i0", "tcbbSyYHnoStM"],
                 ["AIzaSyB", "wScrzLWo", "fcQMJjB4iQN", "AmNzBgfWyc7Rs"],
                 ["AIzaSyD", "OaFELikR", "XdJRjxslRtj", "_LUyFFiOEa2-E"],
-                ["AIzaSyD", "fNAWbpvk", "fEzXoXfkzpD", "Quj3SCbXLXEdw"]
+                ["AIzaSyD", "fNAWbpvk", "fEzXoXfkzpD", "Quj3SCbXLXEdw"],
+                ["AIzaSyC", "NO60AvMB", "spBCAK1Wgl", "Xikhhuja9OarFg"],
+                ["AIzaSyC", "s7Fgi3Mb", "H4qd6GNdBm", "3Yq4aQzSijApBI"],
+                ["AIzaSyD", "lQlD5QA4", "cUnaf93LFj", "FjHe1QnKZRVwGg"],
+                ["AIzaSyD", "ywVP6oaH", "YQCa60lz6-", "PnizD8zMw9bXiA"]
             ];
             const hiddenGeminiKeys = geminiKeyParts.map(parts => parts.join(""));
             let currentGeminiKeyIndex = 0;
@@ -716,7 +726,7 @@
             }
 
             // ============================================
-            // GEMINI VISION ANALYSIS
+            // GEMINI VISION ANALYSIS (2.5 PRO)
             // ============================================
             async function analyzeWithGemini() {
                 const task = document.getElementById('taskSelect').value;
@@ -734,16 +744,16 @@
                 }
 
                 let lastError = null;
-                const maxAttempts = hiddenGeminiKeys.length; // Try all 5 keys
+                const maxAttempts = hiddenGeminiKeys.length; // Try all 9 keys
 
                 // Try all available keys
                 for (let attempt = 0; attempt < maxAttempts; attempt++) {
                     try {
                         const apiKey = getNextGeminiKey();
-                        console.log(`🔑 Trying Gemini key ${attempt + 1}/${maxAttempts}...`);
+                        console.log(`🔑 Trying Gemini 2.5 Pro key ${attempt + 1}/${maxAttempts}...`);
 
                         const response = await fetch(
-                            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+                            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
                             {
                                 method: 'POST',
                                 headers: {
@@ -790,7 +800,7 @@
                         }
 
                         const result = await response.json();
-                        console.log('✅ Gemini success with key', attempt + 1);
+                        console.log('✅ Gemini 2.5 Pro success with key', attempt + 1);
                         displayGeminiResult(result);
                         return; // Success!
 
@@ -819,7 +829,7 @@
 
                 container.innerHTML = `
                     <div class="result-item">
-                        <h3>🌟 Gemini Vision Analysis:</h3>
+                        <h3>💎 Gemini 2.5 Pro Analysis:</h3>
                         <p style="white-space: pre-wrap;">${escapeHtml(text)}</p>
                     </div>
                 `;
