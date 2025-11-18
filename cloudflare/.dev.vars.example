@@ -1,0 +1,14 @@
+# Environment variables for local development
+# Copy this file to .dev.vars and add your actual API keys
+
+# HuggingFace API Keys (comma-separated)
+HF_KEYS=hf_yourkey1,hf_yourkey2,hf_yourkey3
+
+# Google Gemini API Keys (comma-separated)
+GEMINI_KEYS=AIzaYourKey1,AIzaYourKey2,AIzaYourKey3
+
+# Note:
+# - Get HuggingFace keys at: https://huggingface.co/settings/tokens
+# - Get Gemini keys at: https://makersuite.google.com/app/apikey
+# - You can add as many keys as you want, separated by commas
+# - Keys will be auto-rotated when rate limits are hit
