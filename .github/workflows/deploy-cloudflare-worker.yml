@@ -1,0 +1,47 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'cloudflare/**'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare Workers
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd cloudflare
+          npm install -g wrangler
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'cloudflare'
+          secrets: |
+            HF_KEYS
+            GEMINI_KEYS
+        env:
+          HF_KEYS: ${{ secrets.HF_KEYS }}
+          GEMINI_KEYS: ${{ secrets.GEMINI_KEYS }}
+
+      - name: Deployment Success
+        run: |
+          echo "✅ Cloudflare Worker deployed successfully!"
+          echo "🔗 Check your worker at: https://ai-api-proxy.your-subdomain.workers.dev"
