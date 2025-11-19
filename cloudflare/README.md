@@ -16,13 +16,14 @@ Shared server for all AI applications in folders `1`, `2`, and `3`. This Cloudfl
 
 ```
 cloudflare/
-├── server.js              # Main Cloudflare Worker code
-├── wrangler.toml          # Cloudflare configuration
-├── package.json           # NPM dependencies and scripts
-├── .dev.vars.example      # Example environment variables
-├── .gitignore             # Git ignore rules
-├── example-usage.html     # Frontend integration example
-└── README.md              # This file
+├── server.js                # Main Cloudflare Worker code
+├── wrangler.toml            # Cloudflare configuration
+├── package.json             # NPM dependencies and scripts
+├── .dev.vars.example        # Example environment variables
+├── .gitignore               # Git ignore rules
+├── example-usage.html       # Frontend integration example
+├── GITHUB-DEPLOYMENT.md     # GitHub auto-deployment setup guide
+└── README.md                # This file
 ```
 
 ## 🚀 Setup & Deployment
@@ -96,6 +97,21 @@ After deployment, you'll get a URL like:
 ```
 https://ai-api-proxy.your-subdomain.workers.dev
 ```
+
+### 6. GitHub Auto-Deployment (Recommended) 🤖
+
+**Muốn tự động deploy khi push code?** Xem hướng dẫn chi tiết tại: **[GITHUB-DEPLOYMENT.md](./GITHUB-DEPLOYMENT.md)**
+
+**Tóm tắt:**
+1. Tạo Cloudflare API Token
+2. Thêm secrets vào GitHub: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `HF_KEYS`, `GEMINI_KEYS`
+3. Push code → Tự động deploy!
+
+**Lợi ích:**
+- ✅ Deploy tự động khi push code
+- ✅ Không cần chạy lệnh thủ công
+- ✅ CI/CD đầy đủ với GitHub Actions
+- ✅ Theo dõi lịch sử deploy
 
 ## 📡 API Endpoints
 
